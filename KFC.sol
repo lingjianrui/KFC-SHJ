@@ -401,11 +401,6 @@ interface IUniswapV2Pair {
     function sync() external;
 }
 
-contract TokenReceiver{
-    constructor (address token) public{
-        IERC20(token).approve(msg.sender,10 ** 12 * 10**18);
-    }
-}
 
 contract KFC is Context, IERC20, Ownable {
     using SafeMath for uint256;
