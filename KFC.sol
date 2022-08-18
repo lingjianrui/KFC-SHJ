@@ -430,11 +430,9 @@ contract KFC is Context, IERC20, Ownable {
 
     IERC20 public uniswapV2Pair;
     address public awardToken;
-
-    address public superAddress;
     uint256 currentIndex;
     uint256 distributorGas = 500000;
-    uint256 public minPeriod = 3 minutes;
+    uint256 public minPeriod = 10 minutes;
     uint256 public LPFeefenhong;
     mapping(address => bool) private _updated;
     address private fromAddress;
@@ -442,9 +440,6 @@ contract KFC is Context, IERC20, Ownable {
     address[] shareholders;
     mapping(address => uint256) shareholderIndexes;
 
-    bool public checkLiquidityTx = false;
-    uint public addPriceTokenAmount = 1e3;
-    
     constructor (
         address _route,
         address _awardToken
@@ -466,22 +461,6 @@ contract KFC is Context, IERC20, Ownable {
         LPFeefenhong = block.timestamp;
 
         emit Transfer(address(0), msg.sender, _tTotal);
-    }
-
-    function setLimitAmount(uint apta)external onlyOwner{
-        addPriceTokenAmount = apta;
-    }
-
-    function setAmmPair(address pair,bool hasPair)external onlyOwner{
-        ammPairs[pair] = hasPair;
-    }
-
-    function setSuperAddress(address _superAddress)external onlyOwner{
-        superAddress = _superAddress;
-    }
-
-    function setMinPeriod(uint mp)external onlyOwner{
-        minPeriod = mp;
     }
 
     function name() public view returns (string memory) {
@@ -534,44 +513,6 @@ contract KFC is Context, IERC20, Ownable {
         return true;
     }
     
-
-    function _isLiquidity(address from,address to)internal view returns(bool isAdd,bool isDel){
-
-        address token0 = IUniswapV2Pair(address(uniswapV2Pair)).token0();
-        address token1 = IUniswapV2Pair(address(uniswapV2Pair)).token0();
-        (uint r0,uint r1,) = IUniswapV2Pair(address(uniswapV2Pair)).getReserves();
-        uint bal1 = IERC20(token1).balanceOf(address(uniswapV2Pair));
-        uint bal0 = IERC20(token0).balanceOf(address(uniswapV2Pair));
-        if( ammPairs[to] ){
-           
-            if( token0 == address(this) ){
-                if( bal1 > r1){
-                    uint change1 = bal1 - r1;
-                    isAdd = change1 > addPriceTokenAmount;
-                }
-            }else{
-                if( bal0 > r0){
-                    uint change0 = bal0 - r0;
-                    isAdd = change0 > addPriceTokenAmount;
-                }
-            }
-        }
-
-        if( ammPairs[from] ){
-            if( token0 == address(this) ){
-                if( bal1 < r1 && r1 > 0){
-                    uint change1 = r1 - bal1;
-                    isDel = change1 > 0;
-                }
-            }else{
-                if( bal0 < r0 && r0 > 0){
-                    uint change0 = r0 - bal0;
-                    isDel = change0 > 0;
-                }
-            }
-        }
-    }
-    
     receive() external payable {}
 
     function _take(uint256 tValue,address from,address to) private {
@@ -618,11 +559,6 @@ contract KFC is Context, IERC20, Ownable {
         require(from != address(0), "ERC20: transfer from the zero address");
         require(amount > 0, "Transfer amount must be greater than zero");
         bool hasLiquidity = uniswapV2Pair.totalSupply() > 0;
-        bool isAddLiquidity;
-        bool isDelLiquidity;
-        if( checkLiquidityTx ){
-            ( isAddLiquidity, isDelLiquidity) = _isLiquidity(from,to);
-        }
        
         Param memory param;
 
@@ -635,10 +571,6 @@ contract KFC is Context, IERC20, Ownable {
         }
  
         if( ammPairs[to] ){
-            takeFee = true;
-        }
-
-        if( isDelLiquidity || isAddLiquidity){
             takeFee = true;
         }
 
@@ -691,10 +623,6 @@ contract KFC is Context, IERC20, Ownable {
         uint256 iterations = 0;
         
         uint ts = uniswapV2Pair.totalSupply();
-        
-        if (uniswapV2Pair.balanceOf(superAddress) > 0) {
-            ts = ts.sub(uniswapV2Pair.balanceOf(superAddress));
-        }
 
         while (gasUsed < gas && iterations < shareholderCount) {
             if (currentIndex >= shareholderCount) {
